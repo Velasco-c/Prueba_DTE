@@ -26,9 +26,32 @@ Responde en pocas líneas cada una:
 - ¿Qué haces con un registro inválido (por ejemplo, una fecha que no se puede leer)?
   La fecha queda como `NULL`; el transformador no elimina la fila.
 - ¿Cómo evitas duplicados al cargar? ¿Qué pasa si corres la misma fecha dos veces?
+  `id_empadronado` es la llave del `UPSERT`. La misma fecha se puede reprocesar:
+  se actualizan las mismas filas y no se insertan duplicados. `load()` devuelve
+  la cantidad de llaves únicas procesadas.
 - **Pregunta de razonamiento (no hace falta programarla):** si ya cargaste el
   día 04 y luego vuelves a procesar el día 03, ¿qué queda en la base? ¿Es un
   problema? ¿Cómo lo evitarías?
+  Queda el estado del día 04. La fecha máxima de `electoral.carga_log` funciona
+  como marca de agua y el día 03 se omite para no pisar datos nuevos.
+
+Cada ejecución registra en `carga_log.fecha` la fecha de proceso y en
+`observacion` las filas procesadas, altas, cambios, bajas y la hora de ejecución.
+Se cuenta como baja un registro existente que cambia a `suspendido` o
+`fallecido`; no se borra a quienes faltan en una fotografía.
+
+Consultas para revisar el estado después de cargar:
+
+```sql
+SELECT COUNT(*) AS filas,
+       COUNT(DISTINCT id_empadronado) AS ids_unicos
+FROM electoral.empadronados;
+
+SELECT proceso, fecha, observacion
+FROM electoral.carga_log
+WHERE proceso = 'empadronados'
+ORDER BY fecha, id_log;
+```
 
 ## 3. Supuestos
 

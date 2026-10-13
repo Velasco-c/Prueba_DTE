@@ -105,14 +105,75 @@ Marca lo que lograste y deja una nota si quedó parcial.
 
 | Parte | Comando / lugar | Estado |
 |---|---|---|
-| 1. Transformación de datos | `src/transformers/` | ⬜ pendiente |
-| 2. Carga incremental del padrón | `load-empadronados --fecha` | ⬜ pendiente |
+| 1. Data Transformation | `src/transformers/` | ✅ completed |
+| 2. Carga incremental del padrón | `load-empadronados --fecha` | ✅ completada |
 | 3. Análisis de la base de datos (opcional) | `DECISIONES.md`, sección 5 | ⬜ pendiente |
 
 ## Cómo ejecutar mi solución
 
-> Candidato: reemplaza este texto con los pasos exactos para reproducir tu
-> trabajo (comandos, orden y qué resultado esperar).
+Los pasos siguientes asumen que estás en la carpeta `prueba-tecnica-etl`, que
+Docker está iniciado y que `.env` contiene las credenciales de PostgreSQL. Para
+repetir los conteos indicados, usa una base vacía.
+
+### 1. Preparar el entorno de Python
+
+El proyecto usa Python 3.12 (como en `Dockerfile`) y las dependencias de
+`requirements.txt`:
+
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+python -m pip install -r requirements.txt
+[ -f .env ] || cp .env.example .env
+```
+
+### 2. Levantar PostgreSQL
+
+```bash
+docker compose up -d postgres
+docker compose ps                 # esperar a que postgres aparezca como healthy
+docker compose exec postgres psql -U etl_user -d electoral_db -c '\dt electoral.*'  # cambia usuario/base si editaste .env
+```
+
+El healthcheck apunta a la base `electoral_db`. El DDL crea el esquema y las
+tablas cuando PostgreSQL inicializa un volumen vacío.
+
+### 3. Procesar los archivos en orden
+
+```bash
+python main.py load-empadronados --fecha 2026-03-02
+python main.py load-empadronados --fecha 2026-03-03
+python main.py load-empadronados --fecha 2026-03-04
+```
+
+En una base vacía, el resultado esperado es 18,000 filas para el día 02,
+18,131 para el día 03 y 18,277 para el día 04. El resumen informa también las
+altas, los cambios y las transiciones a `suspendido` o `fallecido`.
+
+### 4. Comprobar idempotencia y marca de agua
+
+Reprocesar el día 04 no crea IDs nuevos ni cambia datos. Reprocesar el día 03
+después del 04 se omite porque es anterior a la marca de agua:
+
+```bash
+python main.py load-empadronados --fecha 2026-03-04
+python main.py load-empadronados --fecha 2026-03-03
+```
+
+La carga repetida del 04 debe informar 0 altas, 0 cambios y 0 bajas. La del 03
+debe mostrar `omitido_por_marca_de_agua=True` y `cargados=0`.
+
+### 5. Verificar filas únicas y ejecuciones registradas
+
+```bash
+docker compose exec postgres psql -U etl_user -d electoral_db -c "SELECT COUNT(*) AS filas, COUNT(DISTINCT id_empadronado) AS ids_unicos, COUNT(*) - COUNT(DISTINCT id_empadronado) AS duplicados FROM electoral.empadronados;"
+docker compose exec postgres psql -U etl_user -d electoral_db -c "SELECT proceso, fecha, observacion FROM electoral.carga_log WHERE proceso = 'empadronados' ORDER BY fecha, id_log;"
+```
+
+Con las tres fuentes de ejemplo, la primera consulta debe mostrar 18,277 filas,
+18,277 IDs únicos y 0 duplicados. `carga_log` guarda la fecha procesada y los
+conteos de cada ejecución aceptada; una fecha anterior a la marca de agua se
+omite y no se registra como carga procesada.
 
 ## Instalar y configurar Docker
 

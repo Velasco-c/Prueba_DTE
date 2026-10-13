@@ -58,5 +58,6 @@ class Pipeline:
             "rechazados": rejected,
             "segundos": round(elapsed, 2),
         }
+        metrics.update(getattr(self.loader, "last_metrics", {}))
         logger.info("[%s] fin %s", self.name, metrics)
         return metrics
