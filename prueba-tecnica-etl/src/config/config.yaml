@@ -1,0 +1,15 @@
+# ---------------------------------------------------------------------------
+# Configuración de las fuentes y los flujos.
+# Agregar una fuente nueva debería ser agregar un bloque aquí, no reescribir
+# código.
+# ---------------------------------------------------------------------------
+paths:
+  empadronados: data/empadronados
+
+sources:
+  empadronados:
+    type: csv
+    path_pattern: data/empadronados/empadronados_{fecha}.csv   # {fecha} = YYYYMMDD
+    load_mode: incremental   # actualización diaria
+    target_table: electoral.empadronados
+    natural_key: [id_empadronado]
