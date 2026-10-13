@@ -6,7 +6,12 @@ from src.extractors.csv_extractor import CSVExtractor
 from src.loaders.postgres_loader import IncrementalLoader
 from src.pipelines.base_pipeline import Pipeline
 from src.transformers.base import TransformerPipeline
-from src.transformers.common import StandardizeCategories, TrimStrings
+from src.transformers.common import (
+    Deduplicate,
+    ParseDates,
+    StandardizeCategories,
+    TrimStrings,
+)
 
 
 def build_empadronados_pipeline(fecha: str) -> Pipeline:
@@ -49,6 +54,8 @@ def build_empadronados_pipeline(fecha: str) -> Pipeline:
                 },
             }
         ),
+        ParseDates(["fecha_inscripcion", "fecha_ultima_actualizacion"]),
+        Deduplicate(cfg["natural_key"]),
     )
     validator = None  # TODO (opcional): Validator([...])
     loader = IncrementalLoader(cfg["target_table"], cfg["natural_key"], fecha)

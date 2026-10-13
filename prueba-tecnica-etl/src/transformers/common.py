@@ -10,6 +10,7 @@ archivos de data/empadronados/ antes de escribir código.
 """
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Iterable
 
 from src.transformers.base import BaseTransformer
@@ -64,25 +65,71 @@ class StandardizeCategories(BaseTransformer):
 class ParseDates(BaseTransformer):
     """Convierte fechas en formato mixto (YYYY-MM-DD y DD/MM/YYYY) a YYYY-MM-DD.
 
-    TODO: implementar. Decide qué haces con una fecha que no se puede leer.
+    Values that are empty or do not represent a valid date are set to None;
+    la fila se conserva y no se carga una fecha inválida como si fuera válida.
     """
 
     def __init__(self, fields: list[str]) -> None:
         self.fields = fields
 
     def transform(self, records: Iterable[dict]) -> Iterable[dict]:
-        raise NotImplementedError("TODO: implementar")
+        formats = ("%Y-%m-%d", "%d/%m/%Y")
+
+        for record in records:
+            standardized = record.copy()
+            for field in self.fields:
+                value = standardized.get(field)
+                if value is None:
+                    continue
+                if not isinstance(value, str):
+                    continue
+
+                value = value.strip()
+                if not value:
+                    standardized[field] = None
+                    continue
+
+                for date_format in formats:
+                    try:
+                        standardized[field] = datetime.strptime(
+                            value, date_format
+                        ).date().isoformat()
+                        break
+                    except ValueError:
+                        continue
+                else:
+                    standardized[field] = None
+
+            yield standardized
 
 
 class Deduplicate(BaseTransformer):
     """Elimina filas repetidas según la llave (id_empadronado).
-
-    TODO: implementar. Si dos filas tienen la misma llave pero difieren en
-    otras columnas, decide cuál se queda y documéntalo en DECISIONES.md.
     """
 
     def __init__(self, key: list[str]) -> None:
         self.key = key
 
     def transform(self, records: Iterable[dict]) -> Iterable[dict]:
-        raise NotImplementedError("TODO: implementar")
+        seen: set[tuple] = set()
+
+        for record in records:
+            key_values = tuple(record.get(field) for field in self.key)
+            if any(
+                value is None or (isinstance(value, str) and not value.strip())
+                for value in key_values
+            ):
+                yield record
+                continue
+
+            try:
+                duplicate = key_values in seen
+            except TypeError as exc:
+                raise TypeError(
+                    "Los campos de deduplicación deben ser hashables"
+                ) from exc
+
+            if duplicate:
+                continue
+            seen.add(key_values)
+            yield record

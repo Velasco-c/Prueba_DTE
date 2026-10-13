@@ -9,14 +9,22 @@ Una fila por problema que encontraste en los archivos del padrón.
 
 | # | Columna | Qué encontraste | Ejemplo | Qué hiciste | Por qué |
 |---|---|---|---|---|---|
-| 1 | | | | | |
+| 1 | `sexo` | Mayúsculas y abreviaturas mezcladas; también hay valores vacíos | `M`, `m`, `MASCULINO`, vacío | Convertí masculino a `M`, femenino a `F` y vacío a `NULL` | Unifica categorías sin inventar el sexo faltante |
+| 2 | `rango_edad` | Dos formas para algunos rangos | `18 a 25` / `18-25`, `mayor de 60` / `61+` | Normalicé a `18-25`, `26-35` y `61+`, respectivamente | Facilita agrupar y comparar |
+| 3 | `estado_registro` | Diferencias de mayúsculas | `ACTIVO` / `activo` | Conservé los valores válidos en minúscula | El dominio documentado es `activo`, `suspendido`, `fallecido` |
+| 4 | `fecha_inscripcion` | Formatos ISO y `DD/MM/YYYY` | `2004-02-03` / `04/06/2004` | Convertí fechas válidas a `YYYY-MM-DD`; vacías o inválidas quedan `NULL` | Mantiene un único formato y evita cargar fechas imposibles como texto |
+| 5 | `id_empadronado` | 25 filas repetidas exactamente por archivo diario | El mismo ID y los mismos campos aparecen dos veces | Conservé la primera fila por llave dentro del archivo | Elimina duplicados de la fuente sin alterar el orden |
 
 ## 2. Decisiones
 
 Responde en pocas líneas cada una:
 
 - Si dos filas tienen el mismo `id_empadronado` pero difieren, ¿cuál dejaste y por qué?
+  Se conserva la primera fila del archivo. En los duplicados encontrados en estas
+  fuentes, las filas eran idénticas; si aparecen conflictos, esta política
+  prioriza el orden de la fuente y debería revisarse con una regla de negocio.
 - ¿Qué haces con un registro inválido (por ejemplo, una fecha que no se puede leer)?
+  La fecha queda como `NULL`; el transformador no elimina la fila.
 - ¿Cómo evitas duplicados al cargar? ¿Qué pasa si corres la misma fecha dos veces?
 - **Pregunta de razonamiento (no hace falta programarla):** si ya cargaste el
   día 04 y luego vuelves a procesar el día 03, ¿qué queda en la base? ¿Es un
